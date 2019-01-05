@@ -1,0 +1,20 @@
+[rkz@galera prjmips]$ gcc -fpack-struct -m32 graph_io.c
+[rkz@galera prjmips]$ ./a.out
+ ******
+*    *
+*    *
+*    *
+ *****
+     *
+     *
+ ****
+Pattern occurences found: 8
+(170, 16)
+(250, 16)
+(202, 120)
+(250, 120)
+(266, 133)
+(410, 159)
+(482, 159)
+(450, 237)
+[rkz@galera prjmips]$

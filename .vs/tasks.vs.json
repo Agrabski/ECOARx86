@@ -1,0 +1,10 @@
+{
+  "version": "0.2.1",
+  "tasks": [
+    {
+      "taskName": "task-graph_io",
+      "appliesTo": "graph_io.c",
+      "type": "launch"
+    }
+  ]
+}
