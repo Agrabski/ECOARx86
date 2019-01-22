@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <memory.h>
 #include <math.h>
-extern unsigned long byteswap(unsigned long num);
+//extern unsigned long long byteswap(unsigned long long num);
+//extern unsigned long long getWord(char*pointer, int widith, int x, int y);
 
 typedef struct
 {
@@ -41,6 +42,9 @@ typedef struct
 	unsigned long  RGBQuad_0;
 	unsigned long  RGBQuad_1;
 } bmpHdr;
+
+extern void findPatterns1(imgInfo* pImg, int pSize, int* ptrn, Point* pDst, int* fCnt);
+
 
 void* freeResources(FILE* pFile, void* pFirst, void* pSnd)
 {
@@ -231,20 +235,12 @@ int GetPixel(imgInfo* pImg, int x, int y)
 	return (*pPix & mask)!=0; 
 }
 
-unsigned long getWord(imgInfo* pImg, unsigned x,unsigned y)
-{
-	unsigned char* tmp = pImg->pImg + (((pImg->width + 31) >> 5) << 2) * y + x;
-	unsigned long t = *((unsigned long*)tmp);
-	unsigned long f = byteswap(t);
-	//printf("%08x\t%08x\t(%02i,%02i)\t%02i\n",f,t,x,y, (((pImg->width + 31) >> 5) << 2) * y + x);
-	return f;
-}
 
-int checkPattern(unsigned long buffer, unsigned long mask, int pattern, unsigned n)
+
+int checkPattern(unsigned long long buffer, unsigned long long mask, int pattern, unsigned n)
 {
-	unsigned long patternBuffer = ((((unsigned long)pattern))<<n);
-	unsigned long shiftedBuffer = (buffer&(mask<<n));
-	//printf("%08x\t%08x\t%08x\t%08x\n",buffer,patternBuffer,shiftedBuffer,mask);
+	unsigned long long patternBuffer = ((((unsigned long long)pattern))<<n);
+	unsigned long long shiftedBuffer = (buffer&(mask<<n));
 
 	if(  (shiftedBuffer^patternBuffer) ==0  )
 	{
@@ -257,76 +253,62 @@ int checkPattern(unsigned long buffer, unsigned long mask, int pattern, unsigned
 
 
 }
-
+/*
 void findPatterns(imgInfo * pImg, int*patterns,int patternsCount, Point*result, long unsigned int *resultCount)
 {
 	int patternLength = 7;
 	unsigned currentX = 0;
 	unsigned currentY = 0;
-	unsigned long patternMask = 0;
+	unsigned long long patternMask = 0;
+	int widith =  ( ((pImg->width + 7)/8 + 3)/4 ) * 4;
+	//int actualWidith = (pImg->width + 7)/8;
+	int padding =8* widith - pImg->width; 
 	for(unsigned i =0; i<patternLength; i++)
 		patternMask=(patternMask<<1)|1;
-	int widith =  ( ((pImg->width + 7)/8 + 3)/4 ) * 4;
-	int actualWidith = (pImg->width + 7)/8;
-	int padding =8* widith - pImg->width; 
-	printf("\n%x\n",*(pImg->pImg));
-	getWord(pImg,0,0);
-	getWord(pImg,1,0);
-	getWord(pImg,2,0);
-	getWord(pImg,3,0);
-	getWord(pImg,4,0);
-	getWord(pImg,5,0);
-		printf("\n%x\n",0);
+
 
 	do
 	{
+		unsigned checkedLine = 0;
 		int potentialPatternInWordPositions[32] = {-1};
 		unsigned potentialIndex = 0;
-		unsigned long buffer =getWord(pImg,currentX,currentY);
-		for(unsigned n = 0; n<=(sizeof(long))*8-patternLength;n++)
+		unsigned long long buffer =getWord(pImg->pImg,pImg->width,currentX,currentY);
+					//printf("%08x\t(%02i,%02i)\n",buffer,currentX,currentY);
+
+		for(unsigned n = 0; n<=(sizeof(unsigned long long))*8-patternLength;n++)
 		{
-			if(checkPattern(buffer,patternMask,patterns[0],n))
+			if(checkPattern(buffer,patternMask,patterns[checkedLine],n))
 			{
-				//printf("(%03i,%03i)\n",currentX*8+n,currentY);
-				//printf("%02i\t%08x\t%08x\t%08x\t%02i\t(%03i;%03i)\t%02i\n",*resultCount,buffer,patternBuffer,shiftedBuffer^patternBuffer,potentialIndex,currentX*8+n,currentY,n);
-				potentialPatternInWordPositions[potentialIndex] = n;
-				potentialIndex++;
-			}
-			else
-				potentialPatternInWordPositions[potentialIndex] =-1;
-		}
-		for(unsigned i = 1; i<patternsCount; i++)
-		{
-			unsigned long buffer = getWord(pImg,currentX,(currentY+i));
-			for(unsigned n =0;n<potentialIndex;n++)
-			{
-				if(potentialPatternInWordPositions[n]!=-1)
+				unsigned begin = checkedLine++;
+				if(checkedLine>=patternLength)
+					checkedLine=0;
+				int match = 0;
+				while((checkedLine!=begin))
 				{
-					printf("%08x\t%02i\tits hit or miss\n",buffer,i);
-
-					if(!checkPattern(buffer,patternMask,patterns[i],potentialPatternInWordPositions[n]))
+					buffer =getWord(pImg->pImg,pImg->width,currentX,currentY+checkedLine);
+					//printf("%08x\t%08x\t%08x\t%02i\t(%02i,%02i)\n",buffer,(buffer)&(patternMask<<n),patterns[checkedLine]<<n,checkedLine,currentX,currentY);
+	
+					if(!checkPattern(buffer,patternMask,patterns[checkedLine],n))
 						{
-							potentialPatternInWordPositions[n]=-1;
-							printf("miss\n");
+							break;
 						}
-					else
-					printf("i guess they newer miss huh?\n");
+					checkedLine++;
+					if(checkedLine>=patternLength)
+						checkedLine=0;
+					match++;
 
-					
+				}
+				if(match==patternLength-1)
+				{
+					result[*resultCount].x= currentX*8+patternLength-n+padding+32;
+					result[*resultCount].y=currentY;
+					(*resultCount)++;
+
 				}
 			}
+		}
 
-		}
-		for(unsigned n =0;n<potentialIndex;n++)
-		{
-			if(potentialPatternInWordPositions[n]!=-1)
-			{
-				result[*resultCount].x= currentX*8+patternLength-potentialPatternInWordPositions[n]+padding;
-				result[*resultCount].y=currentY;
-				(*resultCount)++;
-			}
-		}
-		currentX+=3;
+		currentX+=7;
 
 		if(currentX>=(widith)-2)
 			{
@@ -337,7 +319,7 @@ void findPatterns(imgInfo * pImg, int*patterns,int patternsCount, Point*result, 
 
 	}while(currentY<pImg->height);
 }
-
+*/
 Point* FindPattern(imgInfo* pImg, int pSize, int* ptrn, Point* pDst, int* fCnt)
 {
 	int i, j, k, l;
@@ -388,7 +370,8 @@ int main(int argc, char* argv[])
 	}
 	char f1[12] = "src_001.bmp";
 	char f2[17]="small - Copy.bmp";
-	pInfo = readBMP(f1);
+	char f3[10]="64x64.bmp";
+	pInfo = readBMP(f3);
 
 	printf("width=%i\n height=%i\npImg=%i\ncX=%i\ncY=%i\ncol=%i\n",
 			pInfo->width,pInfo->height,pInfo->cX,pInfo->cY,pInfo->col);
@@ -404,25 +387,25 @@ int main(int argc, char* argv[])
 
 	pSize = (7 << 16) | 8;
 
-	//FindPattern(pInfo, pSize, pattern, pts, &pCnt); 
+	FindPattern(pInfo, pSize, pattern, pts, &pCnt); 
 	// because it is hard to count based on coordinates alone 
 	// I invert rectangles found
-/*
+
 	printf("Pattern occurences found: %d\n", pCnt);
 	for (i=0; i<pCnt; ++i)
 	{
 		printf("(%d, %d)\n", pts[i].x, pts[i].y);
 		InvRect(pInfo, & pts[i], pSize);
-	}*/
+	}
 	saveBMP(pInfo, "result.bmp");
 
 	Point tmp [1000];
 	unsigned long resultCount =00;
-	for(unsigned char i=0;i<99;i++)
-		printf("%02x ",*((pInfo->pImg)+i));
-	findPatterns(pInfo,pattern,8,&tmp,&resultCount);
+	//for(unsigned char i=0;i<99;i++)
+		//printf("%02x ",*((pInfo->pImg)+i));
+	findPatterns1(pInfo, pSize, pattern, &tmp, &resultCount);
 
-	printf("Pattern occurences found by your algorithm you ding dong: %d\n", resultCount);
+	printf("Pattern occurences found by your algorithm: %d\n", resultCount);
 	for (i=0; i<resultCount; ++i)
 	{
 		printf("(%d, %d)\n", tmp[i].x, tmp[i].y);
